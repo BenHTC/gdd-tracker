@@ -43,7 +43,7 @@ const STATIONS = [
   { id: "OVD01", name: "Ovid (NW)" }, { id: "STG02", name: "Sterling (NW)" }, { id: "WIG01", name: "Wiggins (NW)" },
 ];
 
-const ADMIN_PW = "admin123";
+const ADMIN_PW = "tF_6HHx72zb@W6w";
 const STORAGE_KEY_SUBS = "gdd:subs";
 const STORAGE_KEY_EJS = "gdd:ejs";
 
@@ -286,7 +286,7 @@ export default function App() {
               {adminErr && <Alert type="error" msg={adminErr} />}
               <Input type="password" value={adminPw} onChange={e => setAdminPw(e.target.value)} placeholder="Password" />
               <Btn onClick={() => { if (adminPw === ADMIN_PW) { setAdminAuth(true); setAdminErr(""); } else setAdminErr("Incorrect password."); }} className="w-full">Login</Btn>
-              <p className="text-xs text-gray-400 text-center">Default password: <code>admin123</code></p>
+
             </div>
           ) : (
             <div className="space-y-6">
