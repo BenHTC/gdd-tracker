@@ -50,14 +50,16 @@ export default async function handler(req, res) {
   }
 
   let subscribers = [];
-  try { subscribers = JSON.parse(subscribersJson || "[]"); } catch {}
+  try { subscribers = JSON.parse(subscribersJson || "[]"); } catch (e) {
+    return res.status(500).json({ error: "Failed to parse SUBSCRIBERS variable.", detail: e.message });
+  }
 
   if (!subscribers.length) {
     return res.status(200).json({ message: "No subscribers. Nothing to send." });
   }
 
-  // Fetch GDD data for all unique stations
-  const allStations = [...new Set(subscribers.flatMap(s => s.stations))];
+  // Fetch GDD data for all unique stations, filtering out any undefined values
+  const allStations = [...new Set(subscribers.flatMap(s => s.stations || []))].filter(Boolean);
   const gddCache = {};
   await Promise.all(allStations.map(async sid => { gddCache[sid] = await fetchGDD(sid); }));
 
