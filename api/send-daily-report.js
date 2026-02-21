@@ -37,12 +37,6 @@ function buildTable(stationResults, stationNames) {
 }
 
 export default async function handler(req, res) {
-  // Verify this is being called by Vercel's cron scheduler
-  const authHeader = req.headers["authorization"];
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
   // Load config from environment variables
   const serviceId = process.env.EMAILJS_SERVICE_ID;
   const templateId = process.env.EMAILJS_TEMPLATE_ID;
