@@ -105,7 +105,7 @@ export default async function handler(req, res) {
   ];
 
   // Send personalized email to each subscriber
-  let sent = 0, failed = 0;
+  let sent = 0, failed = 0, errors = [];
   for (const sub of subscribers) {
     const stationResults = sub.stations.map(sid => ({
       sid,
@@ -134,9 +134,18 @@ export default async function handler(req, res) {
           }
         })
       });
-      if (response.ok) sent++; else failed++;
-    } catch { failed++; }
+      if (response.ok) {
+        sent++;
+      } else {
+        const errText = await response.text();
+        failed++;
+        errors.push({ email: sub.email, status: response.status, detail: errText });
+      }
+    } catch (e) {
+      failed++;
+      errors.push({ email: sub.email, error: e.message });
+    }
   }
 
-  return res.status(200).json({ sent, failed, total: subscribers.length });
+  return res.status(200).json({ sent, failed, total: subscribers.length, errors });
 }
