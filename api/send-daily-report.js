@@ -46,14 +46,17 @@ const STATIONS = [
 ];
 
 async function fetchGDD(sid) {
-  const url = `https://coagmet.colostate.edu/data/gdd/${sid.toLowerCase()}.csv?header=yes`;
+  const year = new Date().getFullYear();
+  const fromDate = `${year}-01-01`;
+  const url = `https://coagmet.colostate.edu/data/gdd/${sid.toLowerCase()}.csv?header=yes&from=${fromDate}`;
   try {
     const res = await fetch(url);
     const txt = await res.text();
     const rows = txt.trim().split("\n").slice(2).map(l => {
       const p = l.split(",").map(x => x.replace(/"/g, "").trim());
       return { date: p[1], gdd: parseFloat(p[2]), daily: parseFloat(p[3]), avg: parseFloat(p[4]) };
-    }).filter(r => r.daily !== -999 && !isNaN(r.daily));
+    }).filter(r => r.gdd !== -999 && !isNaN(r.gdd))
+      .map(r => ({ ...r, avg: r.avg === -999 || isNaN(r.avg) ? null : r.avg }));
     return rows.length ? rows[rows.length - 1] : null;
   } catch { return null; }
 }
@@ -63,8 +66,17 @@ function unsubToken(email) { return Buffer.from(email.toLowerCase().trim()).toSt
 function buildEmailHtml(sub, stationResults, appUrl) {
   const tableRows = stationResults.map(({ name, data: d }) =>
     d
-      ? `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${name}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${d.gdd}°F</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${d.daily}°F</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${d.avg}°F</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;color:#6b7280;">${d.date}</td></tr>`
-      : `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${name}</td><td colspan="4" style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#9ca3af;">No data available</td></tr>`
+      ? `<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif;">${name}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;">${d.gdd} DD</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;">${d.daily} DD</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;">${d.avg !== null ? d.avg + "°F" : "N/A"}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;color:#6b7280;">${d.date}</td>
+         </tr>`
+      : `<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif;">${name}</td>
+          <td colspan="4" style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif;color:#9ca3af;">No data available</td>
+         </tr>`
   ).join("");
 
   const table = `<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
