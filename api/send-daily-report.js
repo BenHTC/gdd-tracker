@@ -1,63 +1,160 @@
 // Vercel Cron Job - runs daily at 7:00 AM Mountain Time (14:00 UTC)
-// Fetches GDD data for all subscribers and sends personalized emails via Resend
+// Fetches temperature data from ACIS API, calculates GDD, and sends emails via Resend
 
 const FROM_EMAIL = "GDD Daily Report <gdd@howardtreecare.com>";
 const RESEND_API_URL = "https://api.resend.com/emails";
+const ACIS_API_URL = "https://data.rcc-acis.org/StnData";
+const BASE_TEMP = 50; // °F
 
 const STATIONS = [
-  { id: "AKR02", name: "Akron" }, { id: "ALT01", name: "Ault" }, { id: "AVN01", name: "Avondale" },
-  { id: "BLA01", name: "Blanca" }, { id: "BNV01", name: "Buena Vista" }, { id: "BRG01", name: "Briggsdale" },
-  { id: "BRL02", name: "Burlington South" }, { id: "BRL03", name: "Burlington 3" }, { id: "CBL01", name: "Carbondale" },
-  { id: "CBN01", name: "Collbran" }, { id: "CCR01", name: "Cherry Creek Reservoir" }, { id: "CHT01", name: "Chatfield" },
-  { id: "CKP01", name: "Cherokee Park" }, { id: "CLK01", name: "Clark" }, { id: "CNN01", name: "Canon City" },
-  { id: "COW01", name: "Cowdrey" }, { id: "CTR01", name: "Center" }, { id: "CTR02", name: "Center 2" },
-  { id: "CTZ01", name: "Cortez" }, { id: "DEN01", name: "Denver" }, { id: "DLR01", name: "Dolores" },
-  { id: "DLT01", name: "Delta" }, { id: "DRG01", name: "Durango" }, { id: "DVC01", name: "Dove Creek" },
-  { id: "EAC01", name: "Eastern Adams County" }, { id: "EGL01", name: "Eagle" }, { id: "EKT01", name: "Eckert" },
-  { id: "FCC01", name: "Christman Field" }, { id: "FCL01", name: "Fort Collins" }, { id: "FRT03", name: "CSU Fruita Exp Station" },
-  { id: "FTC01", name: "Fort Collins AERC" }, { id: "FTC03", name: "CSU - ARDEC" }, { id: "FTL01", name: "Fort Lupton" },
-  { id: "FWL01", name: "Fowler" }, { id: "GBY01", name: "Granby" }, { id: "GJC01", name: "Grand Junction" },
-  { id: "GLY04", name: "Greeley 4" }, { id: "GUN01", name: "Gunnison" }, { id: "GUN02", name: "Gunnison 2" },
-  { id: "GYP01", name: "Gypsum" }, { id: "HEB01", name: "Hebron" }, { id: "HLY01", name: "Holly" },
-  { id: "HLY02", name: "Holly 2" }, { id: "HNE01", name: "Hoehne" }, { id: "HXT01", name: "Haxtun" },
-  { id: "HYD01", name: "Hayden" }, { id: "HYK02", name: "Holyoke" }, { id: "IDL01", name: "Idalia" },
-  { id: "IGN01", name: "Ignacio" }, { id: "IGN02", name: "Ignacio 2" }, { id: "ILF01", name: "Iliff" },
-  { id: "JFN01", name: "Jefferson" }, { id: "KLN01", name: "Kline" }, { id: "KRK01", name: "Kirk" },
-  { id: "KRM01", name: "Kremmling" }, { id: "KSY01", name: "Kersey 1" }, { id: "KSY02", name: "Kersey 2" },
-  { id: "LAM01", name: "Lamar 1" }, { id: "LAM03", name: "Lamar 3" }, { id: "LAM04", name: "Lamar 4" },
-  { id: "LAR01", name: "Larand" }, { id: "LCN01", name: "Lucerne" }, { id: "LJT01", name: "La Junta" },
-  { id: "LMS02", name: "Las Animas 2" }, { id: "LSL01", name: "La Salle" }, { id: "MCL01", name: "McClave" },
-  { id: "MKR01", name: "Meeker" }, { id: "MNC01", name: "Mancos" }, { id: "MTR01", name: "Montrose" },
-  { id: "NUC01", name: "Nucla" }, { id: "NWD01", name: "Norwood" }, { id: "OTH01", name: "Olathe" },
-  { id: "PAI01", name: "Paoli" }, { id: "PAN01", name: "Paonia" }, { id: "PBW01", name: "Pueblo West" },
-  { id: "PGS01", name: "Pagosa Springs" }, { id: "PKN01", name: "Punkin Center" }, { id: "PNR01", name: "Penrose" },
-  { id: "RFD01", name: "Rocky Ford AVRC" }, { id: "SAN01", name: "San Acacio" }, { id: "SBT01", name: "Seibert" },
-  { id: "SLD01", name: "Salida" }, { id: "SLT01", name: "Silt" }, { id: "STG01", name: "Sterling" },
-  { id: "STN01", name: "Stratton" }, { id: "TWC01", name: "Towaoc" }, { id: "WCF01", name: "Westcliffe" },
-  { id: "WFD01", name: "Wolford Mtn Reservoir" }, { id: "WGG01", name: "Wiggins" }, { id: "WLS01", name: "Walsh" },
-  { id: "WRY02", name: "Wray 2" }, { id: "YAM01", name: "Yampa" }, { id: "YJK01", name: "Yellow Jacket" }, { id: "YUM02", name: "Yuma" },
-  { id: "BLD01", name: "Boulder SW (NW)" }, { id: "BLD02", name: "Boulder NW (NW)" }, { id: "BRU01", name: "Brush (NW)" },
-  { id: "BTD01", name: "Berthoud (NW)" }, { id: "CRK01", name: "Crook (NW)" }, { id: "EAT01", name: "Eaton (NW)" },
-  { id: "FTC02", name: "Fort Collins East (NW)" }, { id: "FTC04", name: "Fort Collins Central (NW)" },
-  { id: "FTL02", name: "Fort Lupton (NW)" }, { id: "FTM02", name: "Fort Morgan (NW)" }, { id: "GIL01", name: "Gilcrest (NW)" },
-  { id: "GLY05", name: "Greeley West (NW)" }, { id: "JCN01", name: "Johnsons Corner (NW)" },
-  { id: "LMT01", name: "Longmont South (NW)" }, { id: "LMT02", name: "Longmont West (NW)" }, { id: "LOV01", name: "Loveland (NW)" },
-  { id: "OVD01", name: "Ovid (NW)" }, { id: "STG02", name: "Sterling (NW)" }, { id: "WIG01", name: "Wiggins (NW)" },
+  { id: "050109", name: "Akron 4 E" },
+  { id: "050114", name: "Akron Washington Co AP" },
+  { id: "050130", name: "Alamosa San Luis AP" },
+  { id: "050214", name: "Altenbern" },
+  { id: "050263", name: "Antero Rsvr" },
+  { id: "050454", name: "Bailey" },
+  { id: "050825", name: "Bonham Rsvr" },
+  { id: "050834", name: "Bonny Dam 2NE" },
+  { id: "050848", name: "Boulder" },
+  { id: "051071", name: "Buena Vista 2 S" },
+  { id: "051121", name: "Burlington" },
+  { id: "051179", name: "Byers 5 ENE" },
+  { id: "051294", name: "Canon City" },
+  { id: "051401", name: "Castle Rock" },
+  { id: "051458", name: "Center 4 SSW" },
+  { id: "051528", name: "Cheesman" },
+  { id: "051564", name: "Cheyenne Wells" },
+  { id: "051609", name: "Cimarron" },
+  { id: "051660", name: "Climax" },
+  { id: "051713", name: "Cochetopa Creek" },
+  { id: "051772", name: "Colorado NM" },
+  { id: "051778", name: "Colorado Springs Muni AP" },
+  { id: "051886", name: "Cortez" },
+  { id: "051959", name: "Crested Butte" },
+  { id: "052184", name: "Del Norte 2E" },
+  { id: "052220", name: "Denver Stapleton" },
+  { id: "052281", name: "Dillon 1 E" },
+  { id: "052446", name: "Eads" },
+  { id: "052454", name: "Eagle CO AP" },
+  { id: "052790", name: "Evergreen" },
+  { id: "052932", name: "Flagler 1S" },
+  { id: "053005", name: "Ft Collins" },
+  { id: "053016", name: "Ft Lewis" },
+  { id: "053038", name: "Ft Morgan" },
+  { id: "053246", name: "Gateway" },
+  { id: "053261", name: "Georgetown" },
+  { id: "053488", name: "Grand Junction Walker Fld" },
+  { id: "053489", name: "Grand Junction 6 ESE" },
+  { id: "053496", name: "Grand Lake 1 NW" },
+  { id: "053500", name: "Grand Lake 6 SSW" },
+  { id: "053530", name: "Grant" },
+  { id: "053541", name: "Great Sand Dunes Nat" },
+  { id: "053553", name: "Greeley UNC" },
+  { id: "053662", name: "Gunnison 3 SW" },
+  { id: "053867", name: "Hayden" },
+  { id: "053951", name: "Hermit 7 ESE" },
+  { id: "054076", name: "Holly" },
+  { id: "054082", name: "Holyoke" },
+  { id: "054172", name: "Hugo 1 NW" },
+  { id: "054242", name: "Idalia" },
+  { id: "054388", name: "John Martin Dam" },
+  { id: "054413", name: "Julesburg" },
+  { id: "054452", name: "Kassler" },
+  { id: "054603", name: "Kit Carson" },
+  { id: "054664", name: "Kremmling" },
+  { id: "054720", name: "La Junta Muni AP" },
+  { id: "054742", name: "Lake George 8 SW" },
+  { id: "054762", name: "Lakewood" },
+  { id: "054770", name: "Lamar" },
+  { id: "054834", name: "Las Animas" },
+  { id: "054945", name: "Leroy 9 WSW" },
+  { id: "055056", name: "Littleton" },
+  { id: "055327", name: "Mancos 1SW" },
+  { id: "055446", name: "Maybell" },
+  { id: "055484", name: "Meeker" },
+  { id: "055531", name: "Mesa Verde NP" },
+  { id: "055706", name: "Monte Vista 2W" },
+  { id: "055722", name: "Montrose #2" },
+  { id: "055970", name: "Northdale" },
+  { id: "056266", name: "Palisade" },
+  { id: "056306", name: "Paonia 1SW" },
+  { id: "056740", name: "Pueblo Mem AP" },
+  { id: "056832", name: "Rangely 1E" },
+  { id: "057167", name: "Rocky Ford 2 SE" },
+  { id: "057309", name: "Ruxton Park" },
+  { id: "057370", name: "Salida" },
+  { id: "057460", name: "Sargents" },
+  { id: "057515", name: "Sedgwick 5 S" },
+  { id: "057618", name: "Shoshone" },
+  { id: "057656", name: "Silverton" },
+  { id: "057936", name: "Steamboat Springs" },
+  { id: "058064", name: "Sugarloaf Rsvr" },
+  { id: "058157", name: "Tacony 13 SE" },
+  { id: "058184", name: "Taylor Park" },
+  { id: "058204", name: "Telluride 4WNW" },
+  { id: "058429", name: "Trinidad" },
+  { id: "058434", name: "Trinidad Perry Stokes AP" },
+  { id: "058501", name: "Twin Lakes Rsvr" },
+  { id: "058560", name: "Uravan" },
+  { id: "058582", name: "Vallecito Dam" },
+  { id: "058756", name: "Walden" },
+  { id: "058781", name: "Walsenburg 1 NW" },
+  { id: "058793", name: "Walsh 1 W" },
+  { id: "058839", name: "Waterdale" },
+  { id: "058931", name: "Westcliffe" },
+  { id: "059243", name: "Wray" },
+  { id: "059265", name: "Yampa" },
+  { id: "059295", name: "Yuma" },
 ];
 
-async function fetchGDD(sid) {
+// Calculate GDD from daily max/min temps using base 50°F
+// GDD = max(0, ((Tmax + Tmin) / 2) - base)
+function calcDailyGDD(tmax, tmin, base = BASE_TEMP) {
+  if (tmax === null || tmin === null) return null;
+  return Math.max(0, ((tmax + tmin) / 2) - base);
+}
+
+async function fetchGDD(stationId) {
   const year = new Date().getFullYear();
-  const fromDate = `${year}-01-01`;
-  const url = `https://coagmet.colostate.edu/data/gdd/${sid.toLowerCase()}.csv?header=yes&from=${fromDate}`;
+  const sdate = `${year}-01-01`;
+  const edate = new Date().toISOString().split("T")[0];
   try {
-    const res = await fetch(url);
-    const txt = await res.text();
-    const rows = txt.trim().split("\n").slice(2).map(l => {
-      const p = l.split(",").map(x => x.replace(/"/g, "").trim());
-      return { date: p[1], gdd: parseFloat(p[2]), daily: parseFloat(p[3]), avg: parseFloat(p[4]) };
-    }).filter(r => r.gdd !== -999 && !isNaN(r.gdd))
-      .map(r => ({ ...r, avg: r.avg === -999 || isNaN(r.avg) ? null : r.avg }));
-    return rows.length ? rows[rows.length - 1] : null;
+    const res = await fetch(ACIS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sid: stationId,
+        sdate,
+        edate,
+        elems: [{ name: "maxt" }, { name: "mint" }],
+        output: "json"
+      })
+    });
+    const json = await res.json();
+    if (!json.data || !json.data.length) return null;
+
+    let cumGDD = 0;
+    let lastDate = null;
+    let lastDaily = null;
+
+    for (const row of json.data) {
+      const [date, maxtRaw, mintRaw] = row;
+      const tmax = maxtRaw === "M" || maxtRaw === "T" ? null : parseFloat(maxtRaw);
+      const tmin = mintRaw === "M" || mintRaw === "T" ? null : parseFloat(mintRaw);
+      const daily = calcDailyGDD(tmax, tmin);
+      if (daily !== null) {
+        cumGDD += daily;
+        lastDate = date;
+        lastDaily = daily;
+      }
+    }
+
+    if (lastDate === null) return null;
+    return {
+      date: lastDate,
+      gdd: Math.round(cumGDD * 10) / 10,
+      daily: Math.round(lastDaily * 10) / 10,
+    };
   } catch { return null; }
 }
 
@@ -70,21 +167,19 @@ function buildEmailHtml(sub, stationResults, appUrl) {
           <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif;">${name}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;">${d.gdd} DD</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;">${d.daily} DD</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;">${d.avg !== null ? d.avg + "°F" : "N/A"}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;color:#6b7280;">${d.date}</td>
          </tr>`
       : `<tr>
           <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif;">${name}</td>
-          <td colspan="4" style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif;color:#9ca3af;">No data available</td>
+          <td colspan="3" style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif;color:#9ca3af;">No data available</td>
          </tr>`
   ).join("");
 
   const table = `<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
     <thead><tr style="background-color:#166534;color:#ffffff;">
       <th style="padding:10px 12px;text-align:left;">Station</th>
-      <th style="padding:10px 12px;text-align:center;">Cumul. GDD</th>
-      <th style="padding:10px 12px;text-align:center;">Daily GDD</th>
-      <th style="padding:10px 12px;text-align:center;">Hist. Avg</th>
+      <th style="padding:10px 12px;text-align:center;">Cumul. GDD (degree days)</th>
+      <th style="padding:10px 12px;text-align:center;">Daily GDD (degree days)</th>
       <th style="padding:10px 12px;text-align:center;">Date</th>
     </tr></thead>
     <tbody>${tableRows}</tbody>
@@ -99,10 +194,10 @@ function buildEmailHtml(sub, stationResults, appUrl) {
   <body style="font-family:Arial,sans-serif;color:#1f2937;padding:20px;max-width:700px;margin:0 auto;">
     <h2 style="color:#166534;">🌱 Growing Degree Day Tracker</h2>
     <p>Hello ${sub.name},</p>
-    <p>Here is your daily GDD report for <strong>${new Date().toLocaleDateString("en-US")}</strong>:</p>
+    <p>Here is your daily GDD report for <strong>${new Date().toLocaleDateString("en-US")}</strong> (Base Temp: ${BASE_TEMP}°F, accumulated from Jan 1):</p>
     ${table}
     <p style="margin-top:24px;font-size:13px;color:#6b7280;">
-      Data sourced from <a href="https://coagmet.colostate.edu" style="color:#166534;">CoAgMet – Colorado's Mesonet</a>.
+      Data sourced from <a href="https://climate.colostate.edu/gdd.html" style="color:#166534;">Colorado Climate Center GDD Tool</a> via NWS COOP stations.
     </p>
     <p style="font-size:12px;color:#9ca3af;margin-top:8px;">${unsubLink}</p>
   </body>
