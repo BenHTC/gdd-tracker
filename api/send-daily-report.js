@@ -32,7 +32,8 @@ const STATIONS = [
   { id: "051886", name: "Cortez" },
   { id: "051959", name: "Crested Butte" },
   { id: "052184", name: "Del Norte 2E" },
-  { id: "052220", name: "Denver Stapleton" },
+  { id: "052220", name: "Denver Central Park" },
+  { id: "052223", name: "Denver Water Department" },
   { id: "052281", name: "Dillon 1 E" },
   { id: "052446", name: "Eads" },
   { id: "052454", name: "Eagle CO AP" },
@@ -107,14 +108,7 @@ const STATIONS = [
   { id: "059295", name: "Yuma" },
 ];
 
-// Calculate GDD from daily max/min temps using base 50°F
-// GDD = max(0, ((Tmax + Tmin) / 2) - base)
-function calcDailyGDD(tmax, tmin, base = BASE_TEMP) {
-  if (tmax === null || tmin === null) return null;
-  return Math.max(0, ((tmax + tmin) / 2) - base);
-}
-
-async function fetchGDD(stationId) {
+async function fetchGDD(sid) {
   const year = new Date().getFullYear();
   const sdate = `${year}-01-01`;
   const edate = new Date().toISOString().split("T")[0];
@@ -123,7 +117,7 @@ async function fetchGDD(stationId) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sid: stationId,
+        sid,
         sdate,
         edate,
         elems: [{ name: "maxt" }, { name: "mint" }],
@@ -133,23 +127,19 @@ async function fetchGDD(stationId) {
     const json = await res.json();
     if (!json.data || !json.data.length) return null;
 
-    let cumGDD = 0;
-    let lastDate = null;
-    let lastDaily = null;
-
+    let cumGDD = 0, lastDate = null, lastDaily = null;
     for (const row of json.data) {
       const [date, maxtRaw, mintRaw] = row;
       const tmax = maxtRaw === "M" || maxtRaw === "T" ? null : parseFloat(maxtRaw);
       const tmin = mintRaw === "M" || mintRaw === "T" ? null : parseFloat(mintRaw);
-      const daily = calcDailyGDD(tmax, tmin);
-      if (daily !== null) {
+      if (tmax !== null && tmin !== null) {
+        const daily = Math.max(0, ((tmax + tmin) / 2) - BASE_TEMP);
         cumGDD += daily;
         lastDate = date;
         lastDaily = daily;
       }
     }
-
-    if (lastDate === null) return null;
+    if (!lastDate) return null;
     return {
       date: lastDate,
       gdd: Math.round(cumGDD * 10) / 10,
